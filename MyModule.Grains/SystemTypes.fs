@@ -24,10 +24,10 @@ type GrainModuleWithIntegerKey(services: Type) =
 // A wrapper around IGrain. Passing a clear IGrain into grain functions will
 // give people the wrong idea about what they can do with it.
 type GrainIdentity =
-    private { Ref: IGrain } 
+    private GrainIdentity of IGrain
     with
-        static member create (ref: IGrain) = { Ref = ref.AsReference<IGrain>() }
-        member me.longKey () = me.Ref.GetPrimaryKeyLong()
+        static member create (ref: IGrain) = ref.AsReference<IGrain>() |> GrainIdentity
+        member me.longKey () = let (GrainIdentity ref) = me in ref.GetPrimaryKeyLong()
 
 // Mandatory input to all grain functions.
 type GrainFunctionInput<'TServices> = { 
