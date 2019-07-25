@@ -12,3 +12,5 @@ type T = {
     }
 
 let create name = { Name = name }
+
+let getName { Name = name} = name

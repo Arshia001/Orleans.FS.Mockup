@@ -9,4 +9,16 @@
     <Compile Include="Program.fs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="$(OrleansPackageVersion)" />
+    <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="$(OrleansPackageVersion)" />
+    <PackageReference Include="Microsoft.Orleans.OrleansCodeGenerator" Version="$(OrleansPackageVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MyModule.Common\MyModule.Common.fsproj" />
+    <ProjectReference Include="..\MyModule.Grains.Interfaces\MyModule.Grains.Interfaces.fsproj" />
+    <ProjectReference Include="..\MyModule.Grains\MyModule.Grains.fsproj" />
+  </ItemGroup>
+
 </Project>

@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="SystemTypes.fs" />
+    <Compile Include="HelloWorkerGrain.fs" />
+    <Compile Include="HelloGrain.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.CodeGenerator" Version="$(OrleansPackageVersion)" />
+    <PackageReference Include="TaskBuilder.fs" Version="2.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MyModule.Common\MyModule.Common.fsproj" />
+    <ProjectReference Include="..\MyModule.Grains.Interfaces\MyModule.Grains.Interfaces.fsproj" />
+  </ItemGroup>
+
+</Project>

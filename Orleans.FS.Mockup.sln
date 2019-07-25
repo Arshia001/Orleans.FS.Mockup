@@ -7,6 +7,10 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Orleans.FS.Mockup", "Orlean
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MyModule.Common", "MyModule.Common\MyModule.Common.fsproj", "{523C1F91-F3B5-4744-8DD4-15200F95D156}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MyModule.Grains.Interfaces", "MyModule.Grains.Interfaces\MyModule.Grains.Interfaces.fsproj", "{B596FA3C-9388-4001-A8C7-BB275987A012}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MyModule.Grains", "MyModule.Grains\MyModule.Grains.fsproj", "{1B798203-6156-4F6C-BAA7-A3A981F27E1A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +25,14 @@ Global
 		{523C1F91-F3B5-4744-8DD4-15200F95D156}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{523C1F91-F3B5-4744-8DD4-15200F95D156}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{523C1F91-F3B5-4744-8DD4-15200F95D156}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B596FA3C-9388-4001-A8C7-BB275987A012}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B596FA3C-9388-4001-A8C7-BB275987A012}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B596FA3C-9388-4001-A8C7-BB275987A012}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B596FA3C-9388-4001-A8C7-BB275987A012}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B798203-6156-4F6C-BAA7-A3A981F27E1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B798203-6156-4F6C-BAA7-A3A981F27E1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B798203-6156-4F6C-BAA7-A3A981F27E1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B798203-6156-4F6C-BAA7-A3A981F27E1A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
