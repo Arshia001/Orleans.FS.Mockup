@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29009.5
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Orleans.FS.Mockup", "Orleans.FS.Mockup\Orleans.FS.Mockup.fsproj", "{4953382F-094D-471D-8F76-998088992C53}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MyModule.Common", "MyModule.Common\MyModule.Common.fsproj", "{523C1F91-F3B5-4744-8DD4-15200F95D156}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4953382F-094D-471D-8F76-998088992C53}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4953382F-094D-471D-8F76-998088992C53}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4953382F-094D-471D-8F76-998088992C53}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4953382F-094D-471D-8F76-998088992C53}.Release|Any CPU.Build.0 = Release|Any CPU
+		{523C1F91-F3B5-4744-8DD4-15200F95D156}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{523C1F91-F3B5-4744-8DD4-15200F95D156}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{523C1F91-F3B5-4744-8DD4-15200F95D156}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{523C1F91-F3B5-4744-8DD4-15200F95D156}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {96E3C159-EE2C-41B7-9675-439278585D6B}
+	EndGlobalSection
+EndGlobal
