@@ -5,8 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="HelloWorkerGrain.fs" />
-    <Compile Include="HelloGrain.fs" />
+    <Compile Include="SystemTypes.fs" />
+    <Compile Include="CodeGen.fs" />
   </ItemGroup>
 
   <ItemGroup>

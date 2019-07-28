@@ -1,8 +1,8 @@
 ﻿open System
 open Orleans
 open Orleans.Hosting
-open HelloGrain
 open FSharp.Control.Tasks.V2
+open MyModule.Grains
 
 [<EntryPoint>]
 let main _argv =
@@ -10,7 +10,7 @@ let main _argv =
         SiloHostBuilder()
             .UseLocalhostClustering()
             .ConfigureApplicationParts(fun p -> 
-                p.AddApplicationPart(typeof<HelloGrain.State>.Assembly).WithReferences()
+                p.AddApplicationPart(typeof<HelloGrainState>.Assembly).WithReferences()
                     .WithCodeGeneration()
                     |> ignore
                 )
@@ -23,8 +23,8 @@ let main _argv =
         let client = host.Services.GetService(typeof<IClusterClient>) :?> IClusterClient
         
         let hello = client.getHelloGrain 0L
-        do! SetName (HelloArgs.create "world") hello
-        let! result = SayHello hello
+        do! HelloGrain.setName (HelloArgs.create "world") hello
+        let! result = HelloGrain.sayHello hello
 
         printfn "Run result: %s" result
     } |> Async.AwaitTask |> Async.RunSynchronously
