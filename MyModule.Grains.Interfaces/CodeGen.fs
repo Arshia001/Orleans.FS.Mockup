@@ -1,7 +1,6 @@
 ﻿namespace MyModule.Grains.Interfaces
     open Orleans
     open System.Threading.Tasks
-    open SystemTypes
 
     (*
        This entire library will be codegen'ed. It'll provide two
@@ -13,13 +12,11 @@
     // This is the normal interface...
     type IHelloWorkerGrain =
         inherit IGrainWithIntegerKey
-        inherit IFSharpGrain
 
         abstract SayHello: name: HelloArgs.T -> Task<string>
 
     type IHelloGrain =
         inherit IGrainWithIntegerKey
-        inherit IFSharpGrain
 
         abstract SetName: name: HelloArgs.T -> Task
         abstract SayHello: unit -> Task<string>

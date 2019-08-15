@@ -1,10 +1,14 @@
 ﻿module SystemTypes
 
 open System
-open SystemTypes
 open Orleans
 open System.Threading.Tasks
 open System.Collections.Immutable
+open Microsoft.FSharp.Quotations
+open System.Reflection
+open System.Collections.Generic
+open Microsoft.FSharp.Quotations.Patterns
+open Microsoft.FSharp.Quotations.DerivedPatterns
 
 // Everything in this file belongs inside Orleans.
 
@@ -14,64 +18,66 @@ open System.Collections.Immutable
 type ITransientState<'t> =
     abstract Value: 't with get, set
 
-type IGrainModuleWithIntegerKey = interface end
-type IGrainModuleWithGuidKey = interface end
+// This attribute will be discovered at codegen time. Fields inside the
+// `services` record type will be added to the grain's constructor for DI.
+[<AbstractClass>]
+type GrainModuleAttribute(services: Type) = inherit Attribute()
+
+[<AttributeUsage(AttributeTargets.Class)>]
+type GrainModuleWithIntegerKey(services: Type) =
+    inherit GrainModuleAttribute(services)
+    new() = GrainModuleWithIntegerKey(typeof<unit>)
 
 // A wrapper around IGrain. Passing a clear IGrain into grain functions will
 // give people the wrong idea about what they can do with it.
-type GrainIdentity =
-    private GrainIdentity of IGrain
+// We'll have different identity types for grains with different key types.
+type GrainIdentityI =
+    private GrainIdentity of IGrainWithIntegerKey
     with
-        static member create (ref: IGrain) = ref.AsReference<IGrain>() |> GrainIdentity
-        member me.longKey () = let (GrainIdentity ref) = me in ref.GetPrimaryKeyLong()
+        static member create (ref: IGrainWithIntegerKey) = ref.AsReference<IGrainWithIntegerKey>() |> GrainIdentity
+        member me.key = let (GrainIdentity ref) = me in ref.GetPrimaryKeyLong()
 
-// Mandatory input to all grain functions.
-type GrainFunctionInput<'TServices> = { 
-    Identity: GrainIdentity
+// Mandatory input to all grain functions, also with different types
+// for different grain key types.
+type GrainFunctionInputI<'TServices> = { 
+    Identity: GrainIdentityI
     Services: 'TServices
     GrainFactory: IGrainFactory
     }
 
-// The code below will support calling other grains from within the silo
-// TODO will grains within one assembly call grains from another assembly in the same way?
+// Extract method info of native F# function from a quotation containing a call to it
+let getMethod = function
+    | Call (_, mi, _) -> [], mi
+    | Lambdas (vs, Call(_, mi, _)) -> List.map (fun (v: Var list) -> (List.head v).Type) vs, mi
+    | _ -> failwith "Not a function call"
 
-exception GrainTypeNotFound of Type
+module __GrainPrivate =
+    let internal methodsi = Dictionary<MethodInfo, (IGrainFactory * int64 -> IGrainWithIntegerKey) * MethodInfo>()
 
-let mapTask (f: 'a -> 'b) (t: Task<'a>) = t.ContinueWith((fun (t: Task<'a>) -> f t.Result), TaskContinuationOptions.OnlyOnRanToCompletion)
+    let __registeri (func: Expr, factory: IGrainFactory * int64 -> IGrainWithIntegerKey, interfaceMethod: MethodInfo) =
+        let (_, funcmi) = getMethod func
+        methodsi.Add(funcmi, (factory, interfaceMethod))
 
-// We'll have these for all grain key types, of course
+module __ProxyFunctions =
+    type call1<'p1, 'res>(grainRef: IGrain, method: MethodInfo, args: obj list) =
+        inherit FSharpFunc<'p1, 'res>()
+        override __.Invoke(x: 'p1) = method.Invoke(grainRef, (x :> obj) :: args |> List.rev |> List.toArray) :?> 'res
 
-let mutable longGrains: ImmutableDictionary<Type, IGrainFactory * int64 -> IFSharpGrain> = ImmutableDictionary<_,_>.Empty
-let registerLong<'TGrain when 'TGrain :> IGrainWithIntegerKey and 'TGrain :> IFSharpGrain> moduleType =
-    longGrains <- longGrains.Add(moduleType, fun (gf: IGrainFactory, key: int64) -> gf.GetGrain<'TGrain>(key) :> IFSharpGrain)    
-
-let mutable guidGrains: ImmutableDictionary<Type, IGrainFactory * Guid -> IFSharpGrain> = ImmutableDictionary<_,_>.Empty
-let registerGuid<'TGrain when 'TGrain :> IGrainWithGuidKey and 'TGrain :> IFSharpGrain> moduleType =
-    guidGrains <- guidGrains.Add(moduleType, fun (gf: IGrainFactory, key: Guid) -> gf.GetGrain<'TGrain>(key) :> IFSharpGrain)
-
-let invokeWithResult (grain: IFSharpGrain, f: 'TGrain -> Task<'TResult>) =
-    let f i = f i |> mapTask (fun x -> x :> obj)
-    grain.InvokeFuncWithResult f |> mapTask (fun x -> x :?> 'TResult)
-
-let invokeWithoutResult (grain: IFSharpGrain, f: 'TGrain -> Task) = grain.InvokeFunc f
+    type call2<'p1, 'p2, 'res>(grainRef: IGrain, method: MethodInfo, args: obj list) =
+        inherit FSharpFunc<'p1, FSharpFunc<'p2, 'res>>()
+        override __.Invoke(x: 'p1) = call1<'p2, 'res>(grainRef, method, x :> obj :: args) |> box |> unbox<FSharpFunc<'p2, 'res>>
 
 module Grain =
-    let invokeir<'TGrain, 'TResult, 'TServices when 'TGrain :> IGrainModuleWithIntegerKey> (i: GrainFunctionInput<'TServices>) (key: int64) (f: 'TGrain -> Task<'TResult>) : Task<'TResult> =
-        match longGrains.TryGetValue(typeof<'TGrain>) with
-        | true, g -> invokeWithResult (g (i.GrainFactory, key), f)
-        | false, _ -> GrainTypeNotFound typeof<'TGrain> |> raise
+    let proxyi (f: Expr<GrainFunctionInputI<_> -> 'tres>) (factory: IGrainFactory) (key: int64) : 'tres =
+        let (types, mi) = getMethod f
+        let (refFactory, interfaceMethod) = __GrainPrivate.methodsi.[mi]
+        let ref = refFactory (factory, key)
 
-    let invokei<'TGrain, 'TServices when 'TGrain :> IGrainModuleWithIntegerKey> (i: GrainFunctionInput<'TServices>) (key: int64) (f: 'TGrain -> Task) : Task =
-        match longGrains.TryGetValue(typeof<'TGrain>) with
-        | true, g -> invokeWithoutResult (g (i.GrainFactory, key), f)
-        | false, _ -> GrainTypeNotFound typeof<'TGrain> |> raise
-
-    let invokegr<'TGrain, 'TResult, 'TServices when 'TGrain :> IGrainModuleWithGuidKey> (i: GrainFunctionInput<'TServices>) (key: Guid) (f: 'TGrain -> Task<'TResult>) : Task<'TResult> =
-        match guidGrains.TryGetValue(typeof<'TGrain>) with
-        | true, g -> invokeWithResult (g (i.GrainFactory, key), f)
-        | false, _ -> GrainTypeNotFound typeof<'TGrain> |> raise
-
-    let invokeg<'TGrain, 'TServices when 'TGrain :> IGrainModuleWithGuidKey> (i: GrainFunctionInput<'TServices>) (key: Guid) (f: 'TGrain -> Task) : Task =
-        match guidGrains.TryGetValue(typeof<'TGrain>) with
-        | true, g -> invokeWithoutResult (g (i.GrainFactory, key), f)
-        | false, _ -> GrainTypeNotFound typeof<'TGrain> |> raise
+        match types with
+        | [p] ->
+            let t = typedefof<__ProxyFunctions.call1<_,_>>.MakeGenericType([|p; mi.ReturnType|])
+            t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
+        | [p1; p2] ->
+            let t = typedefof<__ProxyFunctions.call2<_,_,_>>.MakeGenericType([|p1; p2; mi.ReturnType|])
+            t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
+        | _ -> failwith "Too many types? XD" //??

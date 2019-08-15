@@ -5,7 +5,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="SystemTypes.fs" />
     <Compile Include="CodeGen.fs" />
   </ItemGroup>
 

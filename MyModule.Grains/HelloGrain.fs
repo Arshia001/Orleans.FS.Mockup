@@ -16,12 +16,11 @@ type HelloGrainState = { lastHello: string }
 
 type Services = { persistentState: IPersistentState<HelloGrainState>; transientState: ITransientState<HelloArgs.T> }
 
-// Functions inside a `GrainModule` type will be grouped into a single grain class of the same
-// name as the type.
-type HelloGrain(i: GrainFunctionInput<Services>) =
-    interface IGrainModuleWithIntegerKey
-
-    member __.SetName name =
+// Functions inside a `GrainModule` will be grouped into a single grain class of the same
+// name as the parent module.
+[<GrainModuleWithIntegerKey(typeof<Services>)>]
+module HelloGrain =
+    let SetName i name =
         i.Services.transientState.Value <- name
         Task.CompletedTask
 
@@ -31,8 +30,8 @@ type HelloGrain(i: GrainFunctionInput<Services>) =
        discussion about supporting a state machine-style task computation expression in the F#
        language repo, so when that's released, we'll definitely want to stick to tasks.
     *)
-    member __.SayHello () = task {
-        let! result = Grain.invokeir i (i.Identity.longKey ()) <| fun (h: HelloWorkerGrain) -> h.SayHello(i.Services.transientState.Value)
+    let SayHello i = task {
+        let! result = Grain.proxyi <@ HelloWorkerGrain.SayHello @> i.GrainFactory i.Identity.key (i.Services.transientState.Value)
         i.Services.persistentState.State <- { lastHello = result }
         do! i.Services.persistentState.WriteStateAsync()
         return result

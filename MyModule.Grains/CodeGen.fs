@@ -11,34 +11,24 @@ open MyModule.Grains.Interfaces
 type HelloWorkerGrainImpl() as me =
     inherit Grain()
 
-    let instance = HelloWorkerGrain({ Identity = GrainIdentity.create me; Services = (); GrainFactory = me.GrainFactory })
+    let i = { Identity = GrainIdentityI.create me; Services = (); GrainFactory = me.GrainFactory }
 
     interface IHelloWorkerGrain with
-        member __.SayHello name = instance.SayHello name
-
-        member __.InvokeFunc f = 
-            let f = f :?> HelloWorkerGrain -> Task
-            f instance
-        member __.InvokeFuncWithResult f = 
-            let f = f :?> HelloWorkerGrain -> Task<obj>
-            f instance
+        member __.SayHello name = HelloWorkerGrain.SayHello i name
 
 type HelloGrainImpl(_persistentState: IPersistentState<HelloGrainState>, _transientState: ITransientState<HelloArgs.T>) as me =
     inherit Grain()
 
-    let instance = HelloGrain({ Identity = GrainIdentity.create me; Services = { persistentState = _persistentState; transientState = _transientState }; GrainFactory = me.GrainFactory })
+    let i = { Identity = GrainIdentityI.create me; Services = { persistentState = _persistentState; transientState = _transientState }; GrainFactory = me.GrainFactory }
 
     interface IHelloGrain with
-        member __.SetName name = instance.SetName name
-        member __.SayHello () = instance.SayHello ()
-
-        member __.InvokeFunc f = 
-            let f = f :?> HelloGrain -> Task
-            f instance
-        member __.InvokeFuncWithResult f = 
-            let f = f :?> HelloGrain -> Task<obj>
-            f instance
+        member __.SetName name = HelloGrain.SetName i name
+        member __.SayHello () = HelloGrain.SayHello i
 
 module private __GrainInit =
-    registerLong<IHelloWorkerGrain> typeof<HelloWorkerGrain>
-    registerLong<IHelloGrain> typeof<HelloGrain>
+    let helloWorkerFactory (factory: IGrainFactory, key) = factory.GetGrain<IHelloWorkerGrain>(key) :> IGrainWithIntegerKey
+    __GrainPrivate.__registeri (<@@ HelloWorkerGrain.SayHello @@>, helloWorkerFactory, typeof<IHelloWorkerGrain>.GetMethod("SayHello"))
+
+    let helloFactory (factory: IGrainFactory, key) = factory.GetGrain<IHelloGrain>(key) :> IGrainWithIntegerKey
+    __GrainPrivate.__registeri (<@@ HelloGrain.SayHello @@>, helloFactory, typeof<IHelloGrain>.GetMethod("SayHello"))
+    __GrainPrivate.__registeri (<@@ HelloGrain.SetName @@>, helloFactory, typeof<IHelloGrain>.GetMethod("SetName"))
