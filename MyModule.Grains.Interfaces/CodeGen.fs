@@ -1,15 +1,15 @@
-﻿namespace MyModule.Grains.Interfaces
+﻿(*
+   This entire library will be codegen'ed. It'll provide two
+   interfaces to the grains: One will be a normal CLR interface
+   usable from other languages, and the other will be an F# wrapper
+   over that interface.
+*)
+
+namespace MyModule.Grains.Interfaces
     open Orleans
     open System.Threading.Tasks
 
-    (*
-       This entire library will be codegen'ed. It'll provide two
-       interfaces to the grains: One will be a normal CLR interface
-       usable from other languages, and the other will be an F# wrapper
-       over that interface.
-    *)
-
-    // This is the normal interface...
+    // This is the normal interface, in an `Interfaces` namespace...
     type IHelloWorkerGrain =
         inherit IGrainWithIntegerKey
 
@@ -21,12 +21,12 @@
         abstract SetName: name: HelloArgs.T -> Task
         abstract SayHello: unit -> Task<string>
 
-// ... and these are the F# wrapper functions.
-
-namespace MyModule.Grains
+namespace MyModule.GrainProxies
     open Orleans
     open MyModule.Grains.Interfaces
 
+    // ... and these are the F# wrapper functions in a `Proxies` namespace (name up for debate).
+    
     (*
        Grain factory *could* get F#-specific extension methods to create
        grain references.
@@ -43,7 +43,7 @@ namespace MyModule.Grains
        rather they be generated anyway.
     *)
     module HelloWorkerGrain =
-        let SayHello name (grainRef: IHelloWorkerGrain) = grainRef.SayHello(name)
+        let sayHello name (grainRef: IHelloWorkerGrain) = grainRef.SayHello(name)
 
     module HelloGrain =
         let setName name (grainRef: IHelloGrain) = grainRef.SetName(name)

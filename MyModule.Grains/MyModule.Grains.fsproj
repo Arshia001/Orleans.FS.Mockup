@@ -5,7 +5,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="SystemTypes.fs" />
     <Compile Include="HelloWorkerGrain.fs" />
     <Compile Include="HelloGrain.fs" />
     <Compile Include="CodeGen.fs" />
@@ -19,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Core\Core.fsproj" />
     <ProjectReference Include="..\MyModule.Common\MyModule.Common.fsproj" />
     <ProjectReference Include="..\MyModule.Grains.Interfaces\MyModule.Grains.Interfaces.fsproj" />
   </ItemGroup>

@@ -2,7 +2,9 @@
 open Orleans
 open Orleans.Hosting
 open FSharp.Control.Tasks.V2
-open MyModule.Grains
+open MyModule.GrainProxies
+open Microsoft.Extensions.DependencyInjection
+open Core.SystemTypes
 
 [<EntryPoint>]
 let main _argv =
@@ -10,11 +12,12 @@ let main _argv =
         SiloHostBuilder()
             .UseLocalhostClustering()
             .ConfigureApplicationParts(fun p -> 
-                p.AddApplicationPart(typeof<HelloGrainState>.Assembly).WithReferences()
+                p.AddApplicationPart(typeof<MyModule.Grains.HelloGrainState>.Assembly).WithReferences()
                     .WithCodeGeneration()
                     |> ignore
                 )
             .AddMemoryGrainStorageAsDefault()
+            .ConfigureServices(fun s -> s.AddTransient(typedefof<ITransientState<_>>, typedefof<TransientState<_>>) |> ignore)
             .Build()
     
     task {
@@ -23,8 +26,8 @@ let main _argv =
         let client = host.Services.GetService(typeof<IClusterClient>) :?> IClusterClient
         
         let hello = client.getHelloGrain 0L
-        do! HelloGrain.setName (HelloArgs.create "world") hello
-        let! result = HelloGrain.sayHello hello
+        do! hello |> HelloGrain.setName (HelloArgs.create "world")
+        let! result = hello |> HelloGrain.sayHello
 
         printfn "Run result: %s" result
     } |> Async.AwaitTask |> Async.RunSynchronously

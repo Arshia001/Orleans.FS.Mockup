@@ -1,4 +1,4 @@
-﻿module SystemTypes
+﻿module Core.SystemTypes
 
 open System
 open Orleans
@@ -16,7 +16,11 @@ open Microsoft.FSharp.Quotations.DerivedPatterns
 // between calls, no persisting included.
 [<Interface>]
 type ITransientState<'t> =
-    abstract Value: 't with get, set
+    abstract Value: 't option with get, set
+
+type TransientState<'t>() =
+    interface ITransientState<'t> with
+        member val Value = Option<'t>.None with get, set
 
 // This attribute will be discovered at codegen time. Fields inside the
 // `services` record type will be added to the grain's constructor for DI.
@@ -51,14 +55,18 @@ let getMethod = function
     | Lambdas (vs, Call(_, mi, _)) -> List.map (fun (v: Var list) -> (List.head v).Type) vs, mi
     | _ -> failwith "Not a function call"
 
-module __GrainPrivate =
-    let internal methodsi = Dictionary<MethodInfo, (IGrainFactory * int64 -> IGrainWithIntegerKey) * MethodInfo>()
+// Cache of all grain module functions
+module __GrainFunctionCache =
+    let internal methodCacheI = Dictionary<MethodInfo, (IGrainFactory * int64 -> IGrainWithIntegerKey) * MethodInfo>()
 
+    [<Obsolete("For internal use only; do not use directly.")>]
     let __registeri (func: Expr, factory: IGrainFactory * int64 -> IGrainWithIntegerKey, interfaceMethod: MethodInfo) =
         let (_, funcmi) = getMethod func
-        methodsi.Add(funcmi, (factory, interfaceMethod))
+        methodCacheI.Add(funcmi, (factory, interfaceMethod))
 
-module __ProxyFunctions =
+// Implementation of proxies. Proxies are responsible for collecting
+// all arguments and feeding them into interface functions at once.
+module internal ProxyFunctions =
     type call1<'p1, 'res>(grainRef: IGrain, method: MethodInfo, args: obj list) =
         inherit FSharpFunc<'p1, 'res>()
         override __.Invoke(x: 'p1) = method.Invoke(grainRef, (x :> obj) :: args |> List.rev |> List.toArray) :?> 'res
@@ -67,17 +75,22 @@ module __ProxyFunctions =
         inherit FSharpFunc<'p1, FSharpFunc<'p2, 'res>>()
         override __.Invoke(x: 'p1) = call1<'p2, 'res>(grainRef, method, x :> obj :: args) |> box |> unbox<FSharpFunc<'p2, 'res>>
 
-module Grain =
-    let proxyi (f: Expr<GrainFunctionInputI<_> -> 'tres>) (factory: IGrainFactory) (key: int64) : 'tres =
+type IGrainFactory with
+    // Proxy generator. Operates in a completely type-safe manner. Takes a quotation
+    // containing a method call and finds the corresponding interface/method pair.
+    // Also builds a proxy with the same argument types and returns it.
+    // TODO: This could probably be sped up with some caching, since `calln` instances
+    // are immutable and can be cached.
+    member me.proxyi (f: Expr<GrainFunctionInputI<_> -> 'tres>) (key: int64) : 'tres =
         let (types, mi) = getMethod f
-        let (refFactory, interfaceMethod) = __GrainPrivate.methodsi.[mi]
-        let ref = refFactory (factory, key)
+        let (refFactory, interfaceMethod) = __GrainFunctionCache.methodCacheI.[mi]
+        let ref = refFactory (me, key)
 
         match types with
         | [p] ->
-            let t = typedefof<__ProxyFunctions.call1<_,_>>.MakeGenericType([|p; mi.ReturnType|])
+            let t = typedefof<ProxyFunctions.call1<_,_>>.MakeGenericType([|p; mi.ReturnType|])
             t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
         | [p1; p2] ->
-            let t = typedefof<__ProxyFunctions.call2<_,_,_>>.MakeGenericType([|p1; p2; mi.ReturnType|])
+            let t = typedefof<ProxyFunctions.call2<_,_,_>>.MakeGenericType([|p1; p2; mi.ReturnType|])
             t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
-        | _ -> failwith "Too many types? XD" //??
+        | _ -> failwith "Too many args XD" // We'll add more of those callers and support varying numbers of arguments here
