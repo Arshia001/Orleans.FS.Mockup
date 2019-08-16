@@ -70,4 +70,4 @@ type HelloGrainImpl(
 
     interface IHelloGrain with
         member me.SetName name = HelloGrain.setName me.i name
-        member me.SayHello () = HelloGrain.sayHello me.i
+        member me.SayHello () = HelloGrain.sayHello me.i ()

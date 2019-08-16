@@ -35,7 +35,7 @@ module HelloGrain =
        discussion about supporting a state machine-style task computation expression in the F#
        language repo, so when that's released, we'll definitely want to stick to tasks.
     *)
-    let sayHello i = task {
+    let sayHello i () = task {
         // We generate a proxy by giving it a grain function and the grain key.
         // GrainFunctionInputI has the added benefit of making the keys fed into
         // proxies type-safe as well, hence the `i` in `proxyi`.
