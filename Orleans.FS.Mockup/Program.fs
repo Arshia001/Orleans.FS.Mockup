@@ -23,7 +23,7 @@ let main _argv =
     task {
         do! host.StartAsync()
         
-        let client = host.Services.GetService(typeof<IClusterClient>) :?> IClusterClient
+        let client = host.Services.GetRequiredService<IClusterClient>()
         
         let hello = client.getHelloGrain 0L
         do! hello |> HelloGrain.setName (HelloArgs.create "world")
