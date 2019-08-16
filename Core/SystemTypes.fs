@@ -35,17 +35,17 @@ type GrainModuleWithIntegerKey(services: Type) =
 // A wrapper around IGrain. Passing a clear IGrain into grain functions will
 // give people the wrong idea about what they can do with it.
 // We'll have different identity types for grains with different key types.
-type GrainIdentityI =
-    private GrainIdentity of IGrainWithIntegerKey
+type GrainIdentityI<'IGrain when 'IGrain :> IGrainWithIntegerKey> =
+    private GrainIdentity of 'IGrain
     with
-        static member create (ref: IGrainWithIntegerKey) = ref.AsReference<IGrainWithIntegerKey>() |> GrainIdentity
+        static member create (ref: 'IGrain) = ref.AsReference<'IGrain>() |> GrainIdentity
         member me.key = let (GrainIdentity ref) = me in ref.GetPrimaryKeyLong()
 
 // Mandatory input to all grain functions, also with different types
 // for different grain key types.
-type GrainFunctionInputI<'TServices> = { 
-    Identity: GrainIdentityI
-    Services: 'TServices
+type GrainFunctionInputI<'Services, 'IGrain when 'IGrain :> IGrainWithIntegerKey> = { 
+    Identity: GrainIdentityI<'IGrain>
+    Services: 'Services
     GrainFactory: IGrainFactory
     }
 
@@ -81,16 +81,17 @@ type IGrainFactory with
     // Also builds a proxy with the same argument types and returns it.
     // TODO: This could probably be sped up with some caching, since `calln` instances
     // are immutable and can be cached.
-    member me.proxyi (f: Expr<GrainFunctionInputI<_> -> 'tres>) (key: int64) : 'tres =
+    member me.proxyi (f: Expr<GrainFunctionInputI<_,_> -> 'tres>) (key: int64) : 'tres =
         let (types, mi) = getMethod f
         let (refFactory, interfaceMethod) = __GrainFunctionCache.methodCacheI.[mi]
         let ref = refFactory (me, key)
 
         match types with
-        | [p] ->
+        | [] | [_] -> failwith "Too few arguments, grain functions must have at least one more argument beside the first GrainFunctionInput"
+        | [_; p] -> // The first argument is the GrainFunctionInput which we should ignore
             let t = typedefof<ProxyFunctions.call1<_,_>>.MakeGenericType([|p; mi.ReturnType|])
             t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
-        | [p1; p2] ->
+        | [_; p1; p2] ->
             let t = typedefof<ProxyFunctions.call2<_,_,_>>.MakeGenericType([|p1; p2; mi.ReturnType|])
             t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
         | _ -> failwith "Too many args XD" // We'll add more of those callers and support varying numbers of arguments here

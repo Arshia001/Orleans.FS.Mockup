@@ -11,7 +11,10 @@ open FSharp.Control.Tasks.V2
 [<CLIMutable>]
 type HelloGrainState = { lastHello: string }
 
-type Services = { persistentState: IPersistentState<HelloGrainState>; transientState: ITransientState<HelloArgs.T> }
+type Services = { 
+    persistentState: IPersistentState<HelloGrainState>
+    transientState: ITransientState<HelloArgs.T>
+}
 
 // Functions inside a `GrainModule` will be grouped into a single grain class of the same
 // name as the parent module.
@@ -37,7 +40,7 @@ module HelloGrain =
         // GrainFunctionInputI has the added benefit of making the keys fed into
         // proxies type-safe as well, hence the `i` in `proxyi`.
         // This gives us a proxy function with the same arguments as the grain function...
-        let sayHelloProxy = i.GrainFactory.proxyi <@ HelloWorkerGrain.sayHello @> i.Identity.key
+        let sayHelloProxy = i.GrainFactory.proxyi <@ HelloWorkerGrain.sayHello @> (i.Identity.key + 42L)
         
         match i.Services.transientState.Value with
         | Some name ->
