@@ -81,7 +81,7 @@ type IGrainFactory with
     // Also builds a proxy with the same argument types and returns it.
     // TODO: This could probably be sped up with some caching, since `calln` instances
     // are immutable and can be cached.
-    member me.proxyi (f: Expr<GrainFunctionInputI<_,_> -> 'tres>) (key: int64) : 'tres =
+    member me.invokei (f: Expr<GrainFunctionInputI<_,_> -> 'tres>) (key: int64) : 'tres =
         let (types, mi) = getMethod f
         let (refFactory, interfaceMethod) = __GrainFunctionCache.methodCacheI.[mi]
         let ref = refFactory (me, key)
