@@ -49,20 +49,6 @@ type GrainFunctionInputI<'Services, 'IGrain when 'IGrain :> IGrainWithIntegerKey
     GrainFactory: IGrainFactory
     }
 
-open Mono.Reflection
-
-// TODO traverse all fsharp funcs for more than 5 arguments
-let getInvokeMethod f =
-    f.GetType().GetMethods()
-    |> Array.filter (fun m -> m.Name = "Invoke")
-    |> Array.maxBy (fun m -> m.GetParameters().Length)
-
-let getMethodFromBody (body: MethodInfo) =
-    body.GetInstructions()
-    |> Seq.filter (fun i -> i.OpCode = Emit.OpCodes.Call)
-    |> Seq.map (fun i -> i.Operand :?> MethodInfo)
-    |> Seq.head// Cache of all grain module functions
-
 module __GrainFunctionCache =
     let internal methodCacheI = Dictionary<string, (IGrainFactory * int64 -> IGrainWithIntegerKey) * (MethodInfo * Type list * Type)>()
 
