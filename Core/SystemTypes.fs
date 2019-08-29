@@ -49,20 +49,34 @@ type GrainFunctionInputI<'Services, 'IGrain when 'IGrain :> IGrainWithIntegerKey
     GrainFactory: IGrainFactory
     }
 
-// Extract method info of native F# function from a quotation containing a call to it
-let getMethod = function
-    | Call (_, mi, _) -> [], mi
-    | Lambdas (vs, Call(_, mi, _)) -> List.map (fun (v: Var list) -> (List.head v).Type) vs, mi
-    | _ -> failwith "Not a function call"
+open Mono.Reflection
 
-// Cache of all grain module functions
+// TODO traverse all fsharp funcs for more than 5 arguments
+let getInvokeMethod f =
+    f.GetType().GetMethods()
+    |> Array.filter (fun m -> m.Name = "Invoke")
+    |> Array.maxBy (fun m -> m.GetParameters().Length)
+
+let getMethodFromBody (body: MethodInfo) =
+    body.GetInstructions()
+    |> Seq.filter (fun i -> i.OpCode = Emit.OpCodes.Call)
+    |> Seq.map (fun i -> i.Operand :?> MethodInfo)
+    |> Seq.head// Cache of all grain module functions
+
 module __GrainFunctionCache =
-    let internal methodCacheI = Dictionary<MethodInfo, (IGrainFactory * int64 -> IGrainWithIntegerKey) * MethodInfo>()
+    let internal methodCacheI = Dictionary<string, (IGrainFactory * int64 -> IGrainWithIntegerKey) * (MethodInfo * Type list * Type)>()
 
     [<Obsolete("For internal use only; do not use directly.")>]
-    let __registeri (func: Expr, factory: IGrainFactory * int64 -> IGrainWithIntegerKey, interfaceMethod: MethodInfo) =
-        let (_, funcmi) = getMethod func
-        methodCacheI.Add(funcmi, (factory, interfaceMethod))
+    let __registeri (fullTypeName: string, 
+                     factory: IGrainFactory * int64 -> IGrainWithIntegerKey,
+                     method: MethodInfo * Type list * Type) =
+        methodCacheI.Add(fullTypeName, (factory, method))
+
+    let internal getMethodAndTypes (f: FSharpFunc<_,_>) =
+        let name = f.GetType().FullName
+        match methodCacheI.TryGetValue name with
+        | true, x -> x
+        | false, _ ->  failwithf "Unknown function %s" name
 
 // Implementation of proxies. Proxies are responsible for collecting
 // all arguments and feeding them into interface functions at once.
@@ -76,22 +90,23 @@ module internal ProxyFunctions =
         override __.Invoke(x: 'p1) = call1<'p2, 'res>(grainRef, method, x :> obj :: args) |> box |> unbox<FSharpFunc<'p2, 'res>>
 
 type IGrainFactory with
-    // Proxy generator. Operates in a completely type-safe manner. Takes a quotation
-    // containing a method call and finds the corresponding interface/method pair.
+    // Proxy generator. Operates in a completely type-safe manner. Takes a function
+    // and finds the corresponding interface/method pair.
     // Also builds a proxy with the same argument types and returns it.
     // TODO: This could probably be sped up with some caching, since `calln` instances
     // are immutable and can be cached.
-    member me.invokei (f: Expr<GrainFunctionInputI<_,_> -> 'tres>) (key: int64) : 'tres =
-        let (types, mi) = getMethod f
-        let (refFactory, interfaceMethod) = __GrainFunctionCache.methodCacheI.[mi]
+    member me.invokei (f: GrainFunctionInputI<_,_> -> 'tres) (key: int64) : 'tres =
+        let (refFactory, (interfaceMethod, types, returnType)) = __GrainFunctionCache.getMethodAndTypes f
         let ref = refFactory (me, key)
 
         match types with
-        | [] | [_] -> failwith "Too few arguments, grain functions must have at least one more argument beside the first GrainFunctionInput"
-        | [_; p] -> // The first argument is the GrainFunctionInput which we should ignore
-            let t = typedefof<ProxyFunctions.call1<_,_>>.MakeGenericType([|p; mi.ReturnType|])
+        | [] ->
+            let t = typedefof<ProxyFunctions.call1<_,_>>.MakeGenericType([|typeof<unit>; returnType|])
             t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
-        | [_; p1; p2] ->
-            let t = typedefof<ProxyFunctions.call2<_,_,_>>.MakeGenericType([|p1; p2; mi.ReturnType|])
+        | [p] ->
+            let t = typedefof<ProxyFunctions.call1<_,_>>.MakeGenericType([|p; returnType|])
+            t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
+        | [p1; p2] ->
+            let t = typedefof<ProxyFunctions.call2<_,_,_>>.MakeGenericType([|p1; p2; returnType|])
             t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
         | _ -> failwith "Too many args XD" // We'll add more of those callers and support varying numbers of arguments here

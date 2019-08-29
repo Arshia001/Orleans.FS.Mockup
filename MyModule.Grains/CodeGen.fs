@@ -27,11 +27,14 @@ open MyModule.Grains.Interfaces
 #nowarn "44"
 module private __GrainInit =
     let private helloWorkerFactory (factory: IGrainFactory, key) = factory.GetGrain<IHelloWorkerGrain>(key) :> IGrainWithIntegerKey
-    __GrainFunctionCache.__registeri (<@@ HelloWorkerGrain.sayHello @@>, helloWorkerFactory, typeof<IHelloWorkerGrain>.GetMethod("SayHello"))
+    let mi = typeof<IHelloWorkerGrain>.GetMethod("SayHello")
+    // All FSharpFuncs will be discovered at code-gen time and corresponding calls will be created here.
+    // See bottom of file for method by which the corresponding method info can be discovered from an FSFunc.
+    __GrainFunctionCache.__registeri ("MyModule.Grains.HelloGrain+sayHelloProxy@46",
+        helloWorkerFactory, (mi, mi.GetParameters() |> Array.map(fun p -> p.ParameterType) |> List.ofArray, mi.ReturnType))
 
     let private helloFactory (factory: IGrainFactory, key) = factory.GetGrain<IHelloGrain>(key) :> IGrainWithIntegerKey
-    __GrainFunctionCache.__registeri (<@@ HelloGrain.sayHello @@>, helloFactory, typeof<IHelloGrain>.GetMethod("SayHello"))
-    __GrainFunctionCache.__registeri (<@@ HelloGrain.setName @@>, helloFactory, typeof<IHelloGrain>.GetMethod("SetName"))
+    // No one invoked the hello grain methods from within this assembly; so no codegen happens for those.
 
     // This is called so the static constructor runs and method info caches are built
     let ensureInitialized () = ()
@@ -71,3 +74,19 @@ type HelloGrainImpl(
     interface IHelloGrain with
         member me.SetName name = HelloGrain.setName me.i name
         member me.SayHello () = HelloGrain.sayHello me.i ()
+
+
+// To discover MethodInfo from FSFunc:
+
+// open Mono.Reflection
+
+//let getInvokeMethod f = // TODO traverse all fsharp funcs for more than 5 arguments
+//    f.GetType().GetMethods()
+//    |> Array.filter (fun m -> m.Name = "Invoke")
+//    |> Array.maxBy (fun m -> m.GetParameters().Length)
+
+//let getMethodFromBody (body: MethodInfo) =
+//    body.GetInstructions()
+//    |> Seq.filter (fun i -> i.OpCode = Emit.OpCodes.Call)
+//    |> Seq.map (fun i -> i.Operand :?> MethodInfo)
+//    |> Seq.head
