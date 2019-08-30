@@ -45,14 +45,14 @@ module private __GrainInit =
    into grain functions along with any additional parameters.
 *)
 type HelloWorkerGrainImpl() =
-    inherit Grain()
+    inherit FSharpGrain()
 
     static do __GrainInit.ensureInitialized ()
 
     member val i = Unchecked.defaultof<GrainFunctionInputI<unit, IHelloWorkerGrain>> with get, set
 
     override me.OnActivateAsync () =
-        me.i <- { Identity = me :> IHelloWorkerGrain |> GrainIdentityI.create; Services = (); GrainFactory = me.GrainFactory }
+        me.i <- { Identity = me |> GrainIdentityI.create; Services = (); GrainFactory = me.GrainFactory }
         base.OnActivateAsync()
 
     interface IHelloWorkerGrain with
@@ -61,14 +61,14 @@ type HelloWorkerGrainImpl() =
 type HelloGrainImpl(
                     [<PersistentState("state")>] _persistentState: IPersistentState<HelloGrainState>, 
                     _transientState: ITransientState<HelloArgs.T>) =
-    inherit Grain()
+    inherit FSharpGrain()
 
     static do __GrainInit.ensureInitialized ()
 
     member val i = Unchecked.defaultof<GrainFunctionInputI<Services, IHelloGrain>> with get, set
 
     override me.OnActivateAsync () =
-        me.i <- { Identity = me :> IHelloGrain |> GrainIdentityI.create; Services = { persistentState = _persistentState; transientState = _transientState }; GrainFactory = me.GrainFactory }
+        me.i <- { Identity = me |> GrainIdentityI.create; Services = { persistentState = _persistentState; transientState = _transientState }; GrainFactory = me.GrainFactory }
         base.OnActivateAsync()
 
     interface IHelloGrain with

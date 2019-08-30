@@ -44,6 +44,14 @@ module HelloGrain =
         // the name of the compiler-generated FSharpFunc will change and it will break
         // the sample.
         let sayHelloProxy = i.GrainFactory.invokei HelloWorkerGrain.sayHello (i.Identity.key + 42L)
+
+        let mutable timerHandle : System.IDisposable = null
+        let timerFunc (str, int) =
+            timerHandle.Dispose()
+            printfn "Timer callback with values %s, %i" str int
+            Task.CompletedTask
+
+        timerHandle <- Grain.registerTimer i.Identity timerFunc ("type-safe timer parameters", 256) (System.TimeSpan.FromSeconds 1.0) System.TimeSpan.MaxValue
         
         match i.Services.transientState.Value with
         | Some name ->

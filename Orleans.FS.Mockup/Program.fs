@@ -5,6 +5,7 @@ open FSharp.Control.Tasks.V2
 open MyModule.GrainProxies
 open Microsoft.Extensions.DependencyInjection
 open Core.SystemTypes
+open System.Threading.Tasks
 
 [<EntryPoint>]
 let main _argv =
@@ -30,6 +31,10 @@ let main _argv =
         let! result = hello |> HelloGrain.sayHello
 
         printfn "Run result: %s" result
+
+        do! Task.Delay(2_000) // Wait for the timer inside HelloGrain to fire
+
+        do! host.StopAsync()
     } |> Async.AwaitTask |> Async.RunSynchronously
 
     0

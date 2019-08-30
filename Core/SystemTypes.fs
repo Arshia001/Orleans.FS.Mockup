@@ -32,14 +32,33 @@ type GrainModuleWithIntegerKey(services: Type) =
     inherit GrainModuleAttribute(services)
     new() = GrainModuleWithIntegerKey(typeof<unit>)
 
+// F#-specific grain subclass with a few of the methods made public.
+type FSharpGrain() =
+    inherit Grain()
+
+    member internal me.registerTimer (f: 'a -> Task) (state: 'a) dueTime period =
+        let handler (o: obj) = let a = o :?> 'a in f a
+        me.RegisterTimer(Func<_,_>(handler), box state, dueTime, period)
+
+type IGrainIdentity = interface end
+type private IGrainIdentityInternal = abstract grain : FSharpGrain with get
+
 // A wrapper around IGrain. Passing a clear IGrain into grain functions will
 // give people the wrong idea about what they can do with it.
 // We'll have different identity types for grains with different key types.
 type GrainIdentityI<'IGrain when 'IGrain :> IGrainWithIntegerKey> =
-    private GrainIdentity of 'IGrain
+    private GrainIdentity of 'IGrain * FSharpGrain
     with
-        static member create (ref: 'IGrain) = ref.AsReference<'IGrain>() |> GrainIdentity
-        member me.key = let (GrainIdentity ref) = me in ref.GetPrimaryKeyLong()
+        static member create<'TGrain when 'TGrain :> FSharpGrain> (grain: 'TGrain) = (grain.AsReference<'IGrain>(), grain :> FSharpGrain) |> GrainIdentity
+        member me.key = let (GrainIdentity (ref, _)) = me in ref.GetPrimaryKeyLong()
+
+        interface IGrainIdentity
+        interface IGrainIdentityInternal with
+            member me.grain = let (GrainIdentity (_, grain)) = me in grain
+
+module Grain =
+    let registerTimer (i: IGrainIdentity) f state dueTime period =
+        (i |> box |> unbox<IGrainIdentityInternal>).grain.registerTimer f state dueTime period
 
 // Mandatory input to all grain functions, also with different types
 // for different grain key types.
