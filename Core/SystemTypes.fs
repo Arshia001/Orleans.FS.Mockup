@@ -82,6 +82,7 @@ type GrainFunctionInputI<'Services, 'IGrain when 'IGrain :> IGrainWithIntegerKey
     GrainFactory: IGrainFactory
     }
 
+// Cache of FSharpFuncs. The cache is initialized by generated code at startup.
 module __GrainFunctionCache =
     let internal methodCacheI = Dictionary<Type, (IGrainFactory * int64 -> obj)>()
 
@@ -108,10 +109,7 @@ module __ProxyFunctions =
         override __.Invoke(x: 'p1) = call1<'p2, 'res>(grainRef, method, x :> obj :: args) |> box |> unbox<FSharpFunc<'p2, 'res>>
 
 type IGrainFactory with
-    // Proxy generator. Operates in a completely type-safe manner. Takes a function
-    // and finds the corresponding interface/method pair.
-    // Also builds a proxy with the same argument types and returns it.
-    // TODO: This could probably be sped up with some caching, since `calln` instances
-    // are immutable and can be cached.
+    // Proxy generator. Operates in a completely type-safe manner. Takes an FSharpFunc
+    // and builds a proxy with the same argument types.
     member me.invokei (f: GrainFunctionInputI<_,_> -> 'tres) (key: int64) : 'tres =
         __GrainFunctionCache.getProxyMethod f <| (me, key) :?> 'tres
