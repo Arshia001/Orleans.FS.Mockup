@@ -7,4 +7,4 @@ open System.Threading.Tasks
 
 // See comments in HelloGrain.fs.
 
-let sayHello i name = sprintf "Hello %s from worker grain %i" (getName name) i.Identity.key |> Task.FromResult
+let sayHello i name = sprintf "Hello %s from worker grain %i" (getName name) i.IdentityI.key |> Task.FromResult

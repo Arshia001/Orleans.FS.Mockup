@@ -32,6 +32,20 @@ type GrainModuleWithIntegerKey(services: Type) =
     inherit GrainModuleAttribute(services)
     new() = GrainModuleWithIntegerKey(typeof<unit>)
 
+(*
+   While grains have a base class (likely to change soon), we'll use these
+   attributes on functions to introduce them to the code generator. Corresponding
+   methods will the be generated on the grain class.
+*)
+[<AttributeUsage(AttributeTargets.Method)>]
+type OnActivateAttribute() = inherit Attribute()
+
+[<AttributeUsage(AttributeTargets.Method)>]
+type OnDeactivateAttribute() = inherit Attribute()
+
+[<AttributeUsage(AttributeTargets.Method)>]
+type OnReminderAttribute() = inherit Attribute()
+
 // F#-specific grain subclass with a few of the methods made public.
 type FSharpGrain() =
     inherit Grain()
@@ -63,29 +77,28 @@ module Grain =
 // Mandatory input to all grain functions, also with different types
 // for different grain key types.
 type GrainFunctionInputI<'Services, 'IGrain when 'IGrain :> IGrainWithIntegerKey> = { 
-    Identity: GrainIdentityI<'IGrain>
+    IdentityI: GrainIdentityI<'IGrain>
     Services: 'Services
     GrainFactory: IGrainFactory
     }
 
 module __GrainFunctionCache =
-    let internal methodCacheI = Dictionary<string, (IGrainFactory * int64 -> IGrainWithIntegerKey) * (MethodInfo * Type list * Type)>()
+    let internal methodCacheI = Dictionary<Type, (IGrainFactory * int64 -> obj)>()
 
     [<Obsolete("For internal use only; do not use directly.")>]
-    let __registeri (fullTypeName: string, 
-                     factory: IGrainFactory * int64 -> IGrainWithIntegerKey,
-                     method: MethodInfo * Type list * Type) =
-        methodCacheI.Add(fullTypeName, (factory, method))
+    let __registeri<'Grain when 'Grain :> IGrainWithIntegerKey>
+        (t: Type, mkGrain: IGrainFactory * int64 -> 'Grain, mkFunc: 'Grain -> obj) =
+            methodCacheI.Add(t, (fun (f: IGrainFactory, k: int64) -> mkGrain (f, k) |> mkFunc))
 
     let internal getMethodAndTypes (f: FSharpFunc<_,_>) =
-        let name = f.GetType().FullName
-        match methodCacheI.TryGetValue name with
+        let t = f.GetType()
+        match methodCacheI.TryGetValue t with
         | true, x -> x
-        | false, _ ->  failwithf "Unknown function %s" name
+        | false, _ ->  failwithf "Unknown function %s" t.FullName
 
 // Implementation of proxies. Proxies are responsible for collecting
 // all arguments and feeding them into interface functions at once.
-module internal ProxyFunctions =
+module __ProxyFunctions =
     type call1<'p1, 'res>(grainRef: IGrain, method: MethodInfo, args: obj list) =
         inherit FSharpFunc<'p1, 'res>()
         override __.Invoke(x: 'p1) = method.Invoke(grainRef, (x :> obj) :: args |> List.rev |> List.toArray) :?> 'res
@@ -101,17 +114,4 @@ type IGrainFactory with
     // TODO: This could probably be sped up with some caching, since `calln` instances
     // are immutable and can be cached.
     member me.invokei (f: GrainFunctionInputI<_,_> -> 'tres) (key: int64) : 'tres =
-        let (refFactory, (interfaceMethod, types, returnType)) = __GrainFunctionCache.getMethodAndTypes f
-        let ref = refFactory (me, key)
-
-        match types with
-        | [] ->
-            let t = typedefof<ProxyFunctions.call1<_,_>>.MakeGenericType([|typeof<unit>; returnType|])
-            t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
-        | [p] ->
-            let t = typedefof<ProxyFunctions.call1<_,_>>.MakeGenericType([|p; returnType|])
-            t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
-        | [p1; p2] ->
-            let t = typedefof<ProxyFunctions.call2<_,_,_>>.MakeGenericType([|p1; p2; returnType|])
-            t.GetConstructors().[0].Invoke([|ref; interfaceMethod; []|]) |> unbox<'tres>
-        | _ -> failwith "Too many args XD" // We'll add more of those callers and support varying numbers of arguments here
+        __GrainFunctionCache.getMethodAndTypes f <| (me, key) :?> 'tres

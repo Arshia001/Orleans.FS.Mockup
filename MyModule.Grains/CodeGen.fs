@@ -17,6 +17,7 @@ open Orleans.Runtime
 open Orleans
 open Core.SystemTypes
 open MyModule.Grains.Interfaces
+open FSharp.Control.Tasks.V2
 
 (*
    This is where user code and generated code come together. A cache of all grain
@@ -30,10 +31,10 @@ module private __GrainInit =
     let mi = typeof<IHelloWorkerGrain>.GetMethod("SayHello")
     // All FSharpFuncs will be discovered at code-gen time and corresponding calls will be created here.
     // See bottom of file for method by which the corresponding method info can be discovered from an FSFunc.
-    __GrainFunctionCache.__registeri ("MyModule.Grains.HelloGrain+sayHelloProxy@46",
-        helloWorkerFactory, (mi, mi.GetParameters() |> Array.map(fun p -> p.ParameterType) |> List.ofArray, mi.ReturnType))
+    __GrainFunctionCache.__registeri (
+        System.Type.GetType("MyModule.Grains.HelloGrain+sayHelloProxy@58"),
+        helloWorkerFactory, fun grn -> __ProxyFunctions.call1<HelloArgs.T, Task<string>>(grn, mi, []) |> box)
 
-    let private helloFactory (factory: IGrainFactory, key) = factory.GetGrain<IHelloGrain>(key) :> IGrainWithIntegerKey
     // No one invoked the hello grain methods from within this assembly; so no codegen happens for those.
 
     // This is called so the static constructor runs and method info caches are built
@@ -52,8 +53,8 @@ type HelloWorkerGrainImpl() =
     member val i = Unchecked.defaultof<GrainFunctionInputI<unit, IHelloWorkerGrain>> with get, set
 
     override me.OnActivateAsync () =
-        me.i <- { Identity = me |> GrainIdentityI.create; Services = (); GrainFactory = me.GrainFactory }
-        base.OnActivateAsync()
+        me.i <- { IdentityI = me |> GrainIdentityI.create; Services = (); GrainFactory = me.GrainFactory }
+        Task.CompletedTask
 
     interface IHelloWorkerGrain with
         member me.SayHello name = HelloWorkerGrain.sayHello me.i name
@@ -67,9 +68,15 @@ type HelloGrainImpl(
 
     member val i = Unchecked.defaultof<GrainFunctionInputI<Services, IHelloGrain>> with get, set
 
-    override me.OnActivateAsync () =
-        me.i <- { Identity = me |> GrainIdentityI.create; Services = { persistentState = _persistentState; transientState = _transientState }; GrainFactory = me.GrainFactory }
-        base.OnActivateAsync()
+    override me.OnActivateAsync () = 
+        me.i <- { IdentityI = me |> GrainIdentityI.create; Services = { persistentState = _persistentState; transientState = _transientState }; GrainFactory = me.GrainFactory }
+        HelloGrain.onActivate me.i
+
+    override me.OnDeactivateAsync () =
+        HelloGrain.onDeactivate me.i
+
+    interface IRemindable with
+        member me.ReceiveReminder (n, s) = HelloGrain.receiveReminder (me.i, n, s)
 
     interface IHelloGrain with
         member me.SetName name = HelloGrain.setName me.i name

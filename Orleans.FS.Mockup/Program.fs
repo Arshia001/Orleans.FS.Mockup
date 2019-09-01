@@ -22,6 +22,8 @@ let main _argv =
             .Build()
     
     task {
+        printfn "Starting"
+
         do! host.StartAsync()
         
         let client = host.Services.GetRequiredService<IClusterClient>()
@@ -33,6 +35,8 @@ let main _argv =
         printfn "Run result: %s" result
 
         do! Task.Delay(2_000) // Wait for the timer inside HelloGrain to fire
+
+        printfn "Stopping"
 
         do! host.StopAsync()
     } |> Async.AwaitTask |> Async.RunSynchronously
