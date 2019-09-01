@@ -90,7 +90,7 @@ module __GrainFunctionCache =
         (t: Type, mkGrain: IGrainFactory * int64 -> 'Grain, mkFunc: 'Grain -> obj) =
             methodCacheI.Add(t, (fun (f: IGrainFactory, k: int64) -> mkGrain (f, k) |> mkFunc))
 
-    let internal getMethodAndTypes (f: FSharpFunc<_,_>) =
+    let internal getProxyMethod (f: FSharpFunc<_,_>) =
         let t = f.GetType()
         match methodCacheI.TryGetValue t with
         | true, x -> x
@@ -114,4 +114,4 @@ type IGrainFactory with
     // TODO: This could probably be sped up with some caching, since `calln` instances
     // are immutable and can be cached.
     member me.invokei (f: GrainFunctionInputI<_,_> -> 'tres) (key: int64) : 'tres =
-        __GrainFunctionCache.getMethodAndTypes f <| (me, key) :?> 'tres
+        __GrainFunctionCache.getProxyMethod f <| (me, key) :?> 'tres
