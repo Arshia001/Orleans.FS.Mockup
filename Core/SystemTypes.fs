@@ -102,7 +102,10 @@ module __GrainFunctionCache =
 module __ProxyFunctions =
     type call1<'p1, 'res>(grainRef: IGrain, method: MethodInfo, args: obj list) =
         inherit FSharpFunc<'p1, 'res>()
-        override __.Invoke(x: 'p1) = method.Invoke(grainRef, (x :> obj) :: args |> List.rev |> List.toArray) :?> 'res
+        override __.Invoke(x: 'p1) =
+            let args = (x :> obj) :: args |> List.toArray
+            Array.Reverse(args)
+            method.Invoke(grainRef, args) :?> 'res
 
     type call2<'p1, 'p2, 'res>(grainRef: IGrain, method: MethodInfo, args: obj list) =
         inherit FSharpFunc<'p1, FSharpFunc<'p2, 'res>>()
