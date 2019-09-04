@@ -114,5 +114,6 @@ module __ProxyFunctions =
 type IGrainFactory with
     // Proxy generator. Operates in a completely type-safe manner. Takes an FSharpFunc
     // and builds a proxy with the same argument types.
+    // TODO support partially applied grain functions as well
     member me.invokei (f: GrainFunctionInputI<_,_> -> 'tres) (key: int64) : 'tres =
         __GrainFunctionCache.getProxyMethod f <| (me, key) :?> 'tres
