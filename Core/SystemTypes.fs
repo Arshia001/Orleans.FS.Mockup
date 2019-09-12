@@ -24,13 +24,12 @@ type TransientState<'t>() =
 
 // This attribute will be discovered at codegen time. Fields inside the
 // `services` record type will be added to the grain's constructor for DI.
-[<AbstractClass>]
-type GrainModuleAttribute(services: Type) = inherit Attribute()
-
 [<AttributeUsage(AttributeTargets.Class)>]
-type GrainModuleWithIntegerKey(services: Type) =
-    inherit GrainModuleAttribute(services)
-    new() = GrainModuleWithIntegerKey(typeof<unit>)
+type GrainModuleWithIntegerKey(services: Type, genericParameters: string array) =
+    inherit Attribute()
+    new(services: Type) = GrainModuleWithIntegerKey(services, [||])
+    new(genericParameters: string array) = GrainModuleWithIntegerKey(typeof<unit>, genericParameters)
+    new() = GrainModuleWithIntegerKey(typeof<unit>, [||])
 
 (*
    While grains have a base class (likely to change soon), we'll use these
@@ -60,11 +59,11 @@ type private IGrainIdentityInternal = abstract grain : FSharpGrain with get
 // A wrapper around IGrain. Passing a clear IGrain into grain functions will
 // give people the wrong idea about what they can do with it.
 // We'll have different identity types for grains with different key types.
-type GrainIdentityI<'IGrain when 'IGrain :> IGrainWithIntegerKey> =
-    private GrainIdentity of 'IGrain * FSharpGrain
+type GrainIdentityI =
+    private GrainIdentity of int64 * FSharpGrain
     with
-        static member create<'TGrain when 'TGrain :> FSharpGrain> (grain: 'TGrain) = (grain.AsReference<'IGrain>(), grain :> FSharpGrain) |> GrainIdentity
-        member me.key = let (GrainIdentity (ref, _)) = me in ref.GetPrimaryKeyLong()
+        static member create<'TGrain when 'TGrain :> FSharpGrain> (grain: 'TGrain) = (grain.GetPrimaryKeyLong(), grain :> FSharpGrain) |> GrainIdentity
+        member me.key = let (GrainIdentity (key, _)) = me in key
 
         interface IGrainIdentity
         interface IGrainIdentityInternal with
@@ -76,8 +75,8 @@ module Grain =
 
 // Mandatory input to all grain functions, also with different types
 // for different grain key types.
-type GrainFunctionInputI<'Services, 'IGrain when 'IGrain :> IGrainWithIntegerKey> = { 
-    IdentityI: GrainIdentityI<'IGrain>
+type GrainFunctionInputI<'Services> = { 
+    IdentityI: GrainIdentityI
     Services: 'Services
     GrainFactory: IGrainFactory
     }
@@ -109,11 +108,15 @@ module __ProxyFunctions =
 
     type call2<'p1, 'p2, 'res>(grainRef: IGrain, method: MethodInfo, args: obj list) =
         inherit FSharpFunc<'p1, FSharpFunc<'p2, 'res>>()
-        override __.Invoke(x: 'p1) = call1<'p2, 'res>(grainRef, method, x :> obj :: args) |> box |> unbox<FSharpFunc<'p2, 'res>>
+        override __.Invoke(x: 'p1) = call1<'p2, 'res>(grainRef, method, x :> obj :: args) |> box |> unbox<'p2 -> 'res>
+
+    type call3<'p1, 'p2, 'p3, 'res>(grainRef: IGrain, method: MethodInfo, args: obj list) =
+        inherit FSharpFunc<'p1, FSharpFunc<'p2, FSharpFunc<'p3, 'res>>>()
+        override __.Invoke(x: 'p1) = call2<'p2, 'p3, 'res>(grainRef, method, x :> obj :: args) |> box |> unbox<'p2 -> 'p3 -> 'res>
 
 type IGrainFactory with
     // Proxy generator. Operates in a completely type-safe manner. Takes an FSharpFunc
     // and builds a proxy with the same argument types.
     // TODO support partially applied grain functions as well
-    member me.invokei (f: GrainFunctionInputI<_,_> -> 'tres) (key: int64) : 'tres =
+    member me.invokei (f: GrainFunctionInputI<_> -> 'tres) (key: int64) : 'tres =
         __GrainFunctionCache.getProxyMethod f <| (me, key) :?> 'tres

@@ -27,13 +27,13 @@ open FSharp.Control.Tasks.V2
 *)
 #nowarn "44"
 module private __GrainInit =
-    let private helloWorkerFactory (factory: IGrainFactory, key) = factory.GetGrain<IHelloWorkerGrain>(key) :> IGrainWithIntegerKey
-    let mi = typeof<IHelloWorkerGrain>.GetMethod("SayHello")
+    let private helloWorkerFactory_int (factory: IGrainFactory, key) = factory.GetGrain<IHelloWorkerGrain<int>>(key) :> IGrainWithIntegerKey
+    let mi = typeof<IHelloWorkerGrain<int>>.GetMethod("SayHello").MakeGenericMethod(typeof<string>)
     // All FSharpFuncs will be discovered at code-gen time and corresponding calls will be created here.
     // See bottom of file for method by which the corresponding method info can be discovered from an FSFunc.
     __GrainFunctionCache.__registeri (
         System.Type.GetType("MyModule.Grains.HelloGrain+sayHelloProxy@58"),
-        helloWorkerFactory, fun grn -> __ProxyFunctions.call1<HelloArgs.T, Task<string>>(grn, mi, []) |> box)
+        helloWorkerFactory_int, fun grn -> __ProxyFunctions.call3<HelloArgs.T, int, string, Task<string>>(grn, mi, []) |> box)
 
     // No one invoked the hello grain methods from within this assembly; so no codegen happens for those.
 
@@ -45,19 +45,19 @@ module private __GrainInit =
    from the DI system, and compose them into a GrainFunctionInput which will be fed
    into grain functions along with any additional parameters.
 *)
-type HelloWorkerGrainImpl() =
+type HelloWorkerGrainImpl<'T1>() =
     inherit FSharpGrain()
 
     static do __GrainInit.ensureInitialized ()
 
-    member val i = Unchecked.defaultof<GrainFunctionInputI<unit, IHelloWorkerGrain>> with get, set
+    member val i = Unchecked.defaultof<GrainFunctionInputI<unit>> with get, set
 
     override me.OnActivateAsync () =
         me.i <- { IdentityI = me |> GrainIdentityI.create; Services = (); GrainFactory = me.GrainFactory }
         Task.CompletedTask
 
-    interface IHelloWorkerGrain with
-        member me.SayHello name = HelloWorkerGrain.sayHello me.i name
+    interface IHelloWorkerGrain<'T1> with
+        member me.SayHello name (t1: 'T1) (t2: 'T2) = HelloWorkerGrain.sayHello me.i name t1 t2
 
 type HelloGrainImpl(
                     [<PersistentState("state")>] _persistentState: IPersistentState<HelloGrainState>, 
@@ -66,7 +66,7 @@ type HelloGrainImpl(
 
     static do __GrainInit.ensureInitialized ()
 
-    member val i = Unchecked.defaultof<GrainFunctionInputI<Services, IHelloGrain>> with get, set
+    member val i = Unchecked.defaultof<GrainFunctionInputI<Services>> with get, set
 
     override me.OnActivateAsync () = 
         me.i <- { IdentityI = me |> GrainIdentityI.create; Services = { persistentState = _persistentState; transientState = _transientState }; GrainFactory = me.GrainFactory }

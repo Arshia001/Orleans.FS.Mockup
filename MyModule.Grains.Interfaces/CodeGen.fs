@@ -10,10 +10,10 @@ namespace MyModule.Grains.Interfaces
     open System.Threading.Tasks
 
     // This is the normal interface, in an `Interfaces` namespace...
-    type IHelloWorkerGrain =
+    type IHelloWorkerGrain<'T1> =
         inherit IGrainWithIntegerKey
 
-        abstract SayHello: name: HelloArgs.T -> Task<string>
+        abstract SayHello: name: HelloArgs.T -> t1: 'T1 -> t2: 'T2 -> Task<string>
 
     type IHelloGrain =
         inherit IGrainWithIntegerKey
@@ -35,7 +35,7 @@ namespace MyModule.GrainProxies
     module GrainFactory =
         type IGrainFactory with
             member this.getHelloGrain id = this.GetGrain<IHelloGrain>(id)
-            member this.getHelloWorkerGrain id = this.GetGrain<IHelloWorkerGrain>(id)
+            member this.getHelloWorkerGrain<'T1> id = this.GetGrain<IHelloWorkerGrain<'T1>>(id)
 
     (*
        One might argue these functions are useless. However, they can be
@@ -43,7 +43,7 @@ namespace MyModule.GrainProxies
        rather they be generated anyway.
     *)
     module HelloWorkerGrain =
-        let sayHello name (grainRef: IHelloWorkerGrain) = grainRef.SayHello(name)
+        let sayHello name t1 t2 (grainRef: IHelloWorkerGrain<'T1>) = grainRef.SayHello(name) t1 t2
 
     module HelloGrain =
         let setName name (grainRef: IHelloGrain) = grainRef.SetName(name)
