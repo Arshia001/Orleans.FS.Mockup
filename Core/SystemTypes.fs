@@ -25,11 +25,8 @@ type TransientState<'t>() =
 // This attribute will be discovered at codegen time. Fields inside the
 // `services` record type will be added to the grain's constructor for DI.
 [<AttributeUsage(AttributeTargets.Class)>]
-type GrainModuleWithIntegerKey(services: Type, genericParameters: string array) =
+type GrainModuleWithIntegerKey(grainRecordType: Type) =
     inherit Attribute()
-    new(services: Type) = GrainModuleWithIntegerKey(services, [||])
-    new(genericParameters: string array) = GrainModuleWithIntegerKey(typeof<unit>, genericParameters)
-    new() = GrainModuleWithIntegerKey(typeof<unit>, [||])
 
 (*
    While grains have a base class (likely to change soon), we'll use these
@@ -75,9 +72,9 @@ module Grain =
 
 // Mandatory input to all grain functions, also with different types
 // for different grain key types.
-type GrainFunctionInputI<'Services> = { 
+type InputI<'GrainRecord> = { 
     IdentityI: GrainIdentityI
-    Services: 'Services
+    Record: 'GrainRecord
     GrainFactory: IGrainFactory
     }
 
@@ -118,5 +115,5 @@ type IGrainFactory with
     // Proxy generator. Operates in a completely type-safe manner. Takes an FSharpFunc
     // and builds a proxy with the same argument types.
     // TODO support partially applied grain functions as well
-    member me.invokei (f: GrainFunctionInputI<_> -> 'tres) (key: int64) : 'tres =
-        __GrainFunctionCache.getProxyMethod f <| (me, key) :?> 'tres
+    member me.invokei<'TGrainRecord, 'TResult> (f: InputI<'TGrainRecord> -> 'TResult) (key: int64) : 'TResult =
+        __GrainFunctionCache.getProxyMethod f <| (me, key) :?> 'TResult

@@ -11,33 +11,33 @@ open FSharp.Control.Tasks.V2
 [<CLIMutable>]
 type HelloGrainState = { lastHello: string }
 
-type Services = { 
+type HelloGrainT = { 
     persistentState: IPersistentState<HelloGrainState>
     transientState: ITransientState<HelloArgs.T>
 }
 
 // Functions inside a `GrainModule` will be grouped into a single grain class of the same
 // name as the parent module.
-[<GrainModuleWithIntegerKey(typeof<Services>)>]
+[<GrainModuleWithIntegerKey(typeof<HelloGrainT>)>]
 module HelloGrain =
     (*
        `i` will be constrained to be of type GrainFunctionInputI (with the I corresponding to 
        'integer key') by the codegen tool. We can make type-safe access to the grain identity
        this way.
     *)
-    let setName i name =
-        i.Services.transientState.Value <- Some name
+    let setName (i: InputI<HelloGrainT>) name =
+        i.Record.transientState.Value <- Some name
         Task.CompletedTask
 
-    let [<OnActivate>] onActivate i =
+    let [<OnActivate>] onActivate (i: InputI<HelloGrainT>) =
         i.IdentityI.key |> printfn "Hello grain with ID %i activated"
         Task.CompletedTask
 
-    let [<OnDeactivate>] onDeactivate i =
+    let [<OnDeactivate>] onDeactivate (i: InputI<HelloGrainT>) =
         i.IdentityI.key |> printfn "Hello grain with ID %i deactivated"
         Task.CompletedTask
 
-    let [<OnReminder>] receiveReminder (i, reminderName: string, status: TickStatus) =
+    let [<OnReminder>] receiveReminder (i: InputI<HelloGrainT>, reminderName: string, status: TickStatus) =
         printfn "Hello grain with ID %i received reminder %s with tick status %O" (i.IdentityI.key) reminderName status
         Task.CompletedTask
 
@@ -47,7 +47,7 @@ module HelloGrain =
        discussion about supporting a state machine-style task computation expression in the F#
        language repo, so when that's released, we'll definitely want to stick to tasks.
     *)
-    let sayHello i () = task {
+    let sayHello (i: InputI<HelloGrainT>) () = task {
         // We generate a proxy by giving it a grain function and the grain key.
         // GrainFunctionInputI has the added benefit of making the keys fed into
         // proxies type-safe as well, hence the `i` in `invokei`.
@@ -65,15 +65,15 @@ module HelloGrain =
 
         timerHandle <- Grain.registerTimer i.IdentityI timerFunc ("type-safe timer parameters", 256) (System.TimeSpan.FromSeconds 1.0) System.TimeSpan.MaxValue
         
-        match i.Services.transientState.Value with
+        match i.Record.transientState.Value with
         | Some name ->
             // ... which can be used normally.
             let! result = sayHelloProxy name 0 "String parameter"
         
             // Since the actor model keeps each actor's data inside it, mutability is not only
             // harmless (in the concurrency sense), but actually required to make everything work.
-            i.Services.persistentState.State <- { lastHello = result }
-            do! i.Services.persistentState.WriteStateAsync()
+            i.Record.persistentState.State <- { lastHello = result }
+            do! i.Record.persistentState.WriteStateAsync()
 
             return result
 

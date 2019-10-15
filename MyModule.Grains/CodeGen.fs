@@ -17,7 +17,7 @@ open Orleans.Runtime
 open Orleans
 open Core.SystemTypes
 open MyModule.Grains.Interfaces
-open FSharp.Control.Tasks.V2
+open Orleans.Concurrency
 
 (*
    This is where user code and generated code come together. A cache of all grain
@@ -45,15 +45,16 @@ module private __GrainInit =
    from the DI system, and compose them into a GrainFunctionInput which will be fed
    into grain functions along with any additional parameters.
 *)
+[<StatelessWorker>]
 type HelloWorkerGrainImpl<'T1>() =
     inherit FSharpGrain()
 
     static do __GrainInit.ensureInitialized ()
 
-    member val i = Unchecked.defaultof<GrainFunctionInputI<unit>> with get, set
+    member val i = Unchecked.defaultof<InputI<HelloWorkerGrainT<'T1>>> with get, set
 
     override me.OnActivateAsync () =
-        me.i <- { IdentityI = me |> GrainIdentityI.create; Services = (); GrainFactory = me.GrainFactory }
+        me.i <- { IdentityI = me |> GrainIdentityI.create; Record = HelloWorkerGrainT (); GrainFactory = me.GrainFactory }
         Task.CompletedTask
 
     interface IHelloWorkerGrain<'T1> with
@@ -66,10 +67,10 @@ type HelloGrainImpl(
 
     static do __GrainInit.ensureInitialized ()
 
-    member val i = Unchecked.defaultof<GrainFunctionInputI<Services>> with get, set
+    member val i = Unchecked.defaultof<InputI<HelloGrainT>> with get, set
 
     override me.OnActivateAsync () = 
-        me.i <- { IdentityI = me |> GrainIdentityI.create; Services = { persistentState = _persistentState; transientState = _transientState }; GrainFactory = me.GrainFactory }
+        me.i <- { IdentityI = me |> GrainIdentityI.create; Record = { persistentState = _persistentState; transientState = _transientState }; GrainFactory = me.GrainFactory }
         HelloGrain.onActivate me.i
 
     override me.OnDeactivateAsync () =
